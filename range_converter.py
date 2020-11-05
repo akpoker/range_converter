@@ -76,7 +76,7 @@ class RangeConverter_6max:
         return '-'.join(actions_renamed)
 
 
-sample_dir = 'Range/sample'
+sample_dir = 'rng_dir_path'
 p_temp = [pathlib.Path(i) for i in glob.glob('{}/**'.format(sample_dir), recursive=True)]
 f_list = [p for p in p_temp if p.is_file()]
 for file in f_list:
