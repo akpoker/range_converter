@@ -1,84 +1,69 @@
 import os
 
-import glob
-import pathlib
+def rngToTxt(rng_path):
+    with open(rng_path) as f:
+        l_strip = [s.strip() for s in f.readlines()]
+        hand = l_strip[0::2]  # 'AA'
+        probability = l_strip[1::2]  # '0.0;-324999.9999999724'
+
+        # 'XX /n 1.0;0.0' > XX:1.0
+        range_list = ['{0}:{1}'.format(i, j.split(";")[0]) for i, j in zip(hand, probability)]
+
+        return ','.join(range_list)
 
 
-class RangeConverter_6max:
-    def __init__(self, path):
-        """
-        :param path: rng file path ex) test/test/0.0.0.0.0.rng
-        """
-        self.path = path
+def rngNameChanger(rng_filename):
+    """
+    :param rng_filename: ex) 0.0
+    :return: LJ_fold-HJ_fold
+    """
+    action_separated = rng_filename.split('.')
+    player_round = ['LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
+    now_player_order = 0
+    actions_renamed = []
 
-    def pioFileMaker(self):
-        """
+    for j in action_separated:
+        action = int(j)
+        player_order_surplus = now_player_order % len(player_round)
+        now_player = player_round[player_order_surplus]
 
-        :return:range string which PioSolver or GTO+ can read as range
-        """
-        with open(self.path) as f:
-            l_strip = [s.strip() for s in f.readlines()]
-            even = l_strip[0::2]
-            odd = l_strip[1::2]
+        if action == 0:  # fold
+            now_action = now_player + '_fold'
+            actions_renamed.append(now_action)
 
-            # 'XX /n 1.0;0.0' > XX:1.0
-            range_list = ['{0}:{1}'.format(i, j.split(";")[0]) for i, j in zip(even, odd)]
+            player_round.pop(player_order_surplus)  # delete player from player_round
 
-            return ','.join(range_list)
+        elif action == 1:  # call
+            now_action = now_player + '_call'
+            actions_renamed.append(now_action)
 
-    @property
-    def makeActionLine(self):
-        """
-        :return: action line string
-        ex) LJ_open-HJ_3bet-CO_fold-BTN_fold-SB_fold-BB_fold-LJ_4bet-HJ_5betAI
-        """
-        action_line = os.path.splitext(os.path.basename(self.path))[0]
-        action_separated = action_line.split('.')
+            now_player_order += 1
 
-        player_round = ['LJ', 'HJ', 'CO', 'BTN', 'SB', 'BB']
-        now_player_order = 0
-        bet_round = ['open', '3bet', '4bet', '5bet']
-        now_bet_order = 0
-        actions_renamed = []
+        elif action == 3:  # ALL in
+            now_action = '{}_Allin'.format(now_player)
+            actions_renamed.append(now_action)
 
-        for j in action_separated:
-            action = int(j)
-            if action == 0:  # fold
-                player_order_surplus = now_player_order % len(player_round)
-                now_action = player_round[player_order_surplus] + '_fold'
-                actions_renamed.append(now_action)
+            now_player_order += 1
 
-                player_round.pop(player_order_surplus)  # delete player from player_round
+        elif action > 40000:  # bet(%)
+            betSize = str(action - 40000) + '%'  # ex) 40076 - 40000 > 76%
+            now_action = now_player + '_' + betSize
+            actions_renamed.append(now_action)
 
-            elif action == 1:  # call
-                player_order_surplus = now_player_order % len(player_round)
-                now_action = player_round[player_order_surplus] + '_call'
-                actions_renamed.append(now_action)
+            now_player_order += 1
 
-                now_player_order += 1
+        else:  # bet(sb)
+            betSize = str(action) + 'sb'
+            now_action = now_player + '_' + betSize
+            actions_renamed.append(now_action)
 
-            elif action == 3:  # ALL in
-                player_order_surplus = now_player_order % len(player_round)
-                now_action = '{0}_{1}AI'.format(player_round[player_order_surplus], bet_round[now_bet_order])
-                actions_renamed.append(now_action)
+            now_player_order += 1
 
-                now_player_order += 1
-
-            else:  # bet
-                player_order_surplus = now_player_order % len(player_round)
-                now_action = player_round[player_order_surplus] + '_' + bet_round[now_bet_order]
-                actions_renamed.append(now_action)
-
-                now_bet_order += 1
-
-                now_player_order += 1
-
-        return '-'.join(actions_renamed)
+    return '-'.join(actions_renamed)
 
 
-sample_dir = 'rng_dir_path'
-p_temp = [pathlib.Path(i) for i in glob.glob('{}/**'.format(sample_dir), recursive=True)]
-f_list = [p for p in p_temp if p.is_file()]
-for file in f_list:
-    converter = RangeConverter_6max(file)
-    print(converter.makeActionLine)
+# test
+sample_rng_path = 'sampleRngFile' # sample/0.0.0.40065.rng
+basename_without_ext = os.path.splitext(os.path.basename(sample_rng_path))[0]
+print(rngToTxt(sample_rng_path))
+print(rngNameChanger(basename_without_ext))
